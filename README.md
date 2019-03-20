@@ -1,1 +1,2 @@
 # CI-215-Sistemas-Operacionais
+Trabalhos realizados pela disciplina de Sistemas-Operacionais da Universidade Federal do Parana ministrado pelo Porfessor [Carlos Maziero](http://wiki.inf.ufpr.br/maziero/doku.php?id=so:start) 
