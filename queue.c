@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
+//Debug Collors
 #define RED   "\x1B[31m"
 #define GRN   "\x1B[32m"
 #define YEL   "\x1B[33m"
@@ -17,6 +17,15 @@
 #define WHT   "\x1B[37m"
 #define RESET "\x1B[0m"
 
+//Mensagens de erro no debug são printadas com esta função 
+//Por algum motivo 'inline void' não funciona pra compilar 
+void messagePrint(char* color,char* erro, char* message){
+    #ifdef DEBUG
+        printf("%s%s: %s%s\n", color, erro, RESET, message );
+    #endif
+}
+  
+
 queue_t *queue_remove(queue_t **queue, queue_t *elem)
 {
     // Remove o elemento indicado da fila, sem o destruir.
@@ -25,14 +34,19 @@ queue_t *queue_remove(queue_t **queue, queue_t *elem)
     // - a fila nao deve estar vazia
     if (queue == NULL || (*queue) == NULL)
     {
-        printf(YEL " queue_remove erro"RESET": a fila não existe ou esta vazia\n");
+        
+        messagePrint(YEL, "queue_remove erro","a fila não existe ou esta vazia");
+        
+
         return (NULL);
     }
 
     // - o elemento deve existir
     if (elem == NULL)
     {
-        printf(YEL " queue_remove erro"RESET": elemento não existe\n");
+        
+        messagePrint(YEL, "queue_remove erro","elemento não existe");
+        
         return (NULL);
     }
     // - o elemento deve pertencer a fila indicada
@@ -49,7 +63,10 @@ queue_t *queue_remove(queue_t **queue, queue_t *elem)
     }
         if (contem == 0)
         {
-            printf(YEL " queue_remove erro"RESET": elemento não esta na fila\n");
+
+            
+            messagePrint(YEL, "queue_remove erro","elemento não esta na fila");
+        
             return (NULL);
         }
 
@@ -78,19 +95,24 @@ void queue_append(queue_t **queue, queue_t *elem)
     // - a fila deve existir
     if (queue == NULL)
     { //talvez isso bugue (fila vazia)
-        printf(YEL " queue_append erro"RESET": a fila não existe\n");
+        
+        messagePrint(YEL, "queue_append erro","a fila não existe");
+        
         return ;
     }
     // - o elemento deve existir
     if (elem == NULL)
     {
-        printf(YEL " queue_append erro"RESET": elemento não existe\n");
+        
+        messagePrint(YEL, "queue_append erro","elemento não existe");
+        
         return ;
     }
     // - o elemento nao deve estar em outra fila
     if (elem->prev != NULL || elem->next != NULL)
     {
-        printf(YEL " queue_append erro"RESET": elemento já esta em uma fila\n");
+        messagePrint(YEL, "queue_append erro", "elemento já esta em uma fila" );
+
         return ;
     }
     if (*queue != NULL)
