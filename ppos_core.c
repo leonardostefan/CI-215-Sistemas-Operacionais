@@ -1,6 +1,7 @@
 #include "ppos.h"
 #include "stdlib.h"
 #include <stdio.h>
+#include "queue.h"
 
 #define STACKSIZE 32768 /* tamanho de pilha das threads */
 
@@ -13,6 +14,7 @@
 #define CYN "\x1B[36m"
 #define WHT "\x1B[37m"
 #define RESET "\x1B[0m"
+#define aging -1
 
 //Mensagens de erro no debug são printadas com esta função
 //Por algum motivo 'inline void' não funciona pra compilar
@@ -25,19 +27,65 @@ void messagePrint(char *color, char *erro, char *message)
 
 int lastTaskId;
 ucontext_t currentContext;
-task_t *currentTask, *mainTask;
-// Inicializa o sistema operacional; deve ser chamada no inicio do main()
+task_t *currentTask, mainTask, dispatcher, *userTasks;
+
+task_t *scheduler()
+{
+    messagePrint(BLU, "scheduler", "realizando scheduling das tarefas");
+    task_t *aux = userTasks->next;
+    task_t *task_maior = userTasks;
+
+    // envelhece as tarefas quando o processo é chamado
+    do{
+        if (aux->id != task_maior->id)
+            aux->dina_pri += aging;
+        aux = aux->next;
+    }while (aux != task_maior);
+
+    // verifica as prioridades para definir a próxima a ser processada
+    do{
+        if (aux->dina_pri < task_maior->dina_pri)
+            task_maior = aux;
+        aux = aux->next;
+    }while (aux != userTasks);
+
+    task_maior->dina_pri = task_maior->fixed_pri;
+    return task_maior;   
+}
+
+void dispatcher_body ()
+{     
+    task_t *next;
+    messagePrint(MAG, "dispatcher", "entrando no dispatcher");
+    while (queue_size((queue_t*)userTasks) > 0 ){
+      next = scheduler() ;
+      if (next){
+        userTasks = userTasks->next; 
+        // ações antes de lançar a tarefa "next", se houverem
+        task_switch (next) ; 
+        // ações após retornar da tarefa "next", se houverem
+      }
+    }
+    messagePrint(MAG, "dispatcher", "saindo do dispatcher");
+    task_exit(0) ; // encerra a tarefa no dispatcher
+}
+
+// inicializa o sistema operacional; deve ser chamada no inicio do main()
 void ppos_init()
 {
+    messagePrint(CYN, "ppos_init", "Inicializando tudo");
     /* desativa o buffer da saida padrao (stdout), usado pela função printf */
     setvbuf(stdout, 0, _IONBF, 0);
-    mainTask = calloc(1, sizeof(task_t));
-    mainTask->id = 0;
+    mainTask.id = 0;
     lastTaskId = 0;
-    currentTask = mainTask;
-    getcontext(&(mainTask->context));
+    mainTask.fixed_pri = 0;
+    mainTask.dina_pri = 0;
+    getcontext(&(mainTask.context));
+    currentTask = &mainTask;
+    userTasks = NULL;
+    task_create(&dispatcher, (void *)(*dispatcher_body),"");
 
-    messagePrint(CYN, "ppos_init", "S.O. iniciado");
+    messagePrint(CYN, "ppos_init", "Dispatcher iniciado");
 }
 
 // Cria uma nova tarefa. Retorna um ID> 0 ou erro.
@@ -67,19 +115,27 @@ int task_create(task_t *task,               // descritor da nova tarefa
 
     ++lastTaskId;
     task->id = lastTaskId;
+    task->fixed_pri = 0;
+    task->dina_pri = 0;
     makecontext(&(task->context), (void *)(*start_func), 1, arg);
-
+    if(task->id != 1 )
+        queue_append((queue_t**)&userTasks,(queue_t*)task);
     messagePrint(CYN, "task_create", "Pronto");
 
-    return lastTaskId;
-}
+    return lastTaskId;}
+
+
 // Termina a tarefa corrente, indicando um valor de status encerramento
 void task_exit(int exitCode)
 {
-    ucontext_t context;
-    getcontext(&context);
-
-    swapcontext(&context, &(mainTask->context));
+    if(currentTask != &dispatcher){
+        queue_remove((queue_t**)&userTasks,(queue_t*)currentTask); //enteder depois
+        task_switch(&dispatcher);
+    }
+    else{
+        messagePrint(CYN, "task_exit", "Voltando para a main");
+        task_switch(&mainTask);
+    }
     messagePrint(CYN, "task_exit", "Tarefa terminada");
 }
 
@@ -90,7 +146,7 @@ int task_switch(task_t *task)
     task_t *t = currentTask;
     currentTask = task;
     messagePrint(WHT, "task_switch", "executando troca de contexto");
-    swapcontext(&(t->context),&( currentTask->context));
+    swapcontext(&(t->context),&(currentTask->context));
 
     return task->id;
 }
@@ -98,4 +154,27 @@ int task_switch(task_t *task)
 // retorna o identificador da tarefa corrente (main deve ser 0)
 int task_id(){
     return currentTask->id;
+}
+
+// libera o processador para a próxima tarefa
+void task_yield (){
+    task_switch(&dispatcher);    
+}
+
+// define a prioridade estática de uma tarefa (ou a tarefa atual)
+void task_setprio (task_t *task, int prio){
+    if (task == NULL){
+        currentTask->fixed_pri = currentTask->dina_pri = prio;
+    }
+    else{
+        task->fixed_pri = task->dina_pri = prio;
+    }
+}
+
+// retorna a prioridade estática de uma tarefa (ou a tarefa atual)
+int task_getprio (task_t *task){
+    if (task != NULL){
+        return task->fixed_pri;
+    }
+    return currentTask->fixed_pri;
 }

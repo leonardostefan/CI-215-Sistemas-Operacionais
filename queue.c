@@ -19,7 +19,7 @@
 
 //Mensagens de erro no debug são printadas com esta função 
 //Por algum motivo 'inline void' não funciona pra compilar 
-void messagePrint(char* color,char* erro, char* message){
+void messagePrint2(char* color,char* erro, char* message){
     #ifdef DEBUG
         printf("%s%s: %s%s\n", color, erro, RESET, message );
     #endif
@@ -35,7 +35,7 @@ queue_t *queue_remove(queue_t **queue, queue_t *elem)
     if (queue == NULL || (*queue) == NULL)
     {
         
-        messagePrint(YEL, "queue_remove erro","a fila não existe ou esta vazia");
+        messagePrint2(YEL, "queue_remove erro","a fila não existe ou esta vazia");
         
 
         return (NULL);
@@ -45,7 +45,7 @@ queue_t *queue_remove(queue_t **queue, queue_t *elem)
     if (elem == NULL)
     {
         
-        messagePrint(YEL, "queue_remove erro","elemento não existe");
+        messagePrint2(YEL, "queue_remove erro","elemento não existe");
         
         return (NULL);
     }
@@ -65,7 +65,7 @@ queue_t *queue_remove(queue_t **queue, queue_t *elem)
         {
 
             
-            messagePrint(YEL, "queue_remove erro","elemento não esta na fila");
+            messagePrint2(YEL, "queue_remove erro","elemento não esta na fila");
         
             return (NULL);
         }
@@ -96,7 +96,7 @@ void queue_append(queue_t **queue, queue_t *elem)
     if (queue == NULL)
     { //talvez isso bugue (fila vazia)
         
-        messagePrint(YEL, "queue_append erro","a fila não existe");
+        messagePrint2(YEL, "queue_append erro","a fila não existe");
         
         return ;
     }
@@ -104,14 +104,14 @@ void queue_append(queue_t **queue, queue_t *elem)
     if (elem == NULL)
     {
         
-        messagePrint(YEL, "queue_append erro","elemento não existe");
+        messagePrint2(YEL, "queue_append erro","elemento não existe");
         
         return ;
     }
     // - o elemento nao deve estar em outra fila
     if (elem->prev != NULL || elem->next != NULL)
     {
-        messagePrint(YEL, "queue_append erro", "elemento já esta em uma fila" );
+        messagePrint2(YEL, "queue_append erro", "elemento já esta em uma fila" );
 
         return ;
     }

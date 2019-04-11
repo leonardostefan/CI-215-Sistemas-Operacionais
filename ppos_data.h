@@ -17,6 +17,8 @@ typedef struct task_t
    int id ;				// identificador da tarefa
    ucontext_t context ;			// contexto armazenado da tarefa
    void *stack ;			// aponta para a pilha da tarefa
+   int fixed_pri; 		// por padrão, prioridade fixa é igual a 0
+   int dina_pri;		// prioridade dinâmica inicia igual a fixa
    // ... (outros campos serão adicionados mais tarde)
 } task_t ;
 
