@@ -1,0 +1,24 @@
+main: inicio
+[36mppos_init: [0mInicializando tudo
+[37mtask_create: [0mentrando na função
+[37mtask_create: [0mpilha criada
+[36mtask_create: [0mPronto
+[33mqueue_remove erro: [0ma fila não existe ou esta vazia
+[36mppos_init: [0mDispatcher iniciado
+[37mtask_create: [0mentrando na função
+[37mtask_create: [0mpilha criada
+[36mtask_create: [0mPronto
+[37mtask_switch: [0mexecutando troca de contexto
+Estou na tarefa     2
+[37mtask_switch: [0mexecutando troca de contexto
+[35mdispatcher: [0mentrando no dispatcher
+[35mdispatcher: [0msaindo do dispatcher
+[36mtask_exit: [0mVoltando para a main
+[37mtask_switch: [0mexecutando troca de contexto
+[37mtask_create: [0mentrando na função
+[37mtask_create: [0mpilha criada
+[36mtask_create: [0mPronto
+[37mtask_switch: [0mexecutando troca de contexto
+Estou na tarefa     3
+[37mtask_switch: [0mexecutando troca de contexto
+[36mtask_exit: [0mTarefa terminada

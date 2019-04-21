@@ -1,7 +1,11 @@
+/* Código feito pelos alunos Cesar Camillo (GRR20160169) e Leonardo Stefan (GRR20163052) */
+
 #include "ppos.h"
 #include "stdlib.h"
 #include <stdio.h>
 #include "queue.h"
+#include <signal.h>
+#include <sys/time.h>
 
 #define STACKSIZE 32768 /* tamanho de pilha das threads */
 
@@ -14,7 +18,11 @@
 #define CYN "\x1B[36m"
 #define WHT "\x1B[37m"
 #define RESET "\x1B[0m"
+
+//Constantes
 #define aging -1
+#define QUANTUM_TICKS 20
+#define QUANTUM_MICRO_SEG 1000
 
 //Mensagens de erro no debug são printadas com esta função
 //Por algum motivo 'inline void' não funciona pra compilar
@@ -28,6 +36,9 @@ void messagePrint(char *color, char *erro, char *message)
 int lastTaskId;
 ucontext_t currentContext;
 task_t *currentTask, mainTask, dispatcher, *userTasks;
+struct sigaction action; // estrutura que define o tratador do sinal
+struct itimerval timer; // estrutura de inicialização do timer
+int quantum; // quantum global
 
 task_t *scheduler()
 {
@@ -61,13 +72,26 @@ void dispatcher_body ()
       next = scheduler() ;
       if (next){
         userTasks = userTasks->next; 
+
         // ações antes de lançar a tarefa "next", se houverem
+        quantum = QUANTUM_TICKS; // ao entrar numa tarefa nova, precisa ser alocado o quantum para o mesmo
+
         task_switch (next) ; 
         // ações após retornar da tarefa "next", se houverem
       }
     }
     messagePrint(MAG, "dispatcher", "saindo do dispatcher");
     task_exit(0) ; // encerra a tarefa no dispatcher
+}
+
+void tratador (int signal)
+{
+	// necessario verificar se é tarefa do usuário ou do sistema
+	if (currentTask->id != dispatcher.id)
+		if (quantum == 0)
+			task_yield();
+
+	quantum--;
 }
 
 // inicializa o sistema operacional; deve ser chamada no inicio do main()
@@ -84,6 +108,27 @@ void ppos_init()
     currentTask = &mainTask;
     userTasks = NULL;
     task_create(&dispatcher, (void *)(*dispatcher_body),"");
+    queue_remove((queue_t**)&userTasks, (queue_t*)&dispatcher);
+
+    action.sa_handler = tratador;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+    if (sigaction (SIGALRM, &action, 0) < 0)
+    {
+        perror ("Erro em sigaction: ") ;
+        exit (1) ;
+    }
+    timer.it_value.tv_usec = QUANTUM_MICRO_SEG;      // primeiro disparo, em micro-segundos 1000 = 1 millisegundos
+    timer.it_value.tv_sec  = 0 ;      // primeiro disparo, em segundos
+    timer.it_interval.tv_usec = QUANTUM_MICRO_SEG;   // disparos subsequentes, em micro-segundos 1000 = 1 millisegundos
+    timer.it_interval.tv_sec  = 0 ;   // disparos subsequentes, em segundos
+    
+    // arma o temporizador ITIMER_REAL (vide man setitimer)
+    if (setitimer (ITIMER_REAL, &timer, 0) < 0)
+    {
+       perror ("Erro em setitimer: ") ;
+       exit (1) ;
+    }
 
     messagePrint(CYN, "ppos_init", "Dispatcher iniciado");
 }
@@ -129,7 +174,7 @@ int task_create(task_t *task,               // descritor da nova tarefa
 void task_exit(int exitCode)
 {
     if(currentTask != &dispatcher){
-        queue_remove((queue_t**)&userTasks,(queue_t*)currentTask); //enteder depois
+        queue_remove((queue_t**)&userTasks,(queue_t*)currentTask); 
         task_switch(&dispatcher);
     }
     else{
