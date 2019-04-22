@@ -20,9 +20,9 @@
 #endif
 
 // otimizações podem atrapalhar código que manipula contexto
-#ifdef __OPTIMIZE__
-#error "Please do not use optimizations (-O1, -O2, ...)"
-#endif
+// #ifdef __OPTIMIZE__
+// #error "Please do not use optimizations (-O1, -O2, ...)"
+// #endif
 
 // funções gerais ==============================================================
 

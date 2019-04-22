@@ -33,12 +33,17 @@ void messagePrint(char *color, char *erro, char *message)
 #endif
 }
 
+
+//Definição de variaveis globais
 int lastTaskId;
 ucontext_t currentContext;
 task_t *currentTask, mainTask, dispatcher, *userTasks;
 struct sigaction action; // estrutura que define o tratador do sinal
 struct itimerval timer; // estrutura de inicialização do timer
 int quantum; // quantum global
+unsigned int ticks = 0;
+unsigned int initialTime=0;
+unsigned int total=0;
 
 task_t *scheduler()
 {
@@ -92,11 +97,19 @@ void tratador (int signal)
 			task_yield();
 
 	quantum--;
+    ticks++;
+}
+
+unsigned int systime () {
+    return ticks ++;
 }
 
 // inicializa o sistema operacional; deve ser chamada no inicio do main()
+
 void ppos_init()
 {
+
+
     messagePrint(CYN, "ppos_init", "Inicializando tudo");
     /* desativa o buffer da saida padrao (stdout), usado pela função printf */
     setvbuf(stdout, 0, _IONBF, 0);
@@ -123,13 +136,14 @@ void ppos_init()
     timer.it_interval.tv_usec = QUANTUM_MICRO_SEG;   // disparos subsequentes, em micro-segundos 1000 = 1 millisegundos
     timer.it_interval.tv_sec  = 0 ;   // disparos subsequentes, em segundos
     
+
     // arma o temporizador ITIMER_REAL (vide man setitimer)
     if (setitimer (ITIMER_REAL, &timer, 0) < 0)
     {
        perror ("Erro em setitimer: ") ;
        exit (1) ;
     }
-
+    initialTime=systime();
     messagePrint(CYN, "ppos_init", "Dispatcher iniciado");
 }
 
@@ -142,6 +156,11 @@ int task_create(task_t *task,               // descritor da nova tarefa
     messagePrint(WHT, "task_create", "entrando na função");
 
     getcontext(&(task->context));
+
+    task->calls=0;
+    task->initialTime=systime();
+    
+
     task->stack = malloc(STACKSIZE);
     if (task->stack)
     {
@@ -173,13 +192,27 @@ int task_create(task_t *task,               // descritor da nova tarefa
 // Termina a tarefa corrente, indicando um valor de status encerramento
 void task_exit(int exitCode)
 {
+    unsigned int exec= systime() -currentTask->initialTime;
+    unsigned int process= (currentTask->calls*QUANTUM_TICKS)-quantum;
+    unsigned int calls= currentTask->calls;
     if(currentTask != &dispatcher){
         queue_remove((queue_t**)&userTasks,(queue_t*)currentTask); 
+            total+=process;
+        printf("Task %d exit:\n    execution time %u ms,\n    processor time  %u ms,\n    %u activations\n",currentTask->id, exec, process, calls );
         task_switch(&dispatcher);
+
+
     }
     else{
         messagePrint(CYN, "task_exit", "Voltando para a main");
+        printf("Task %d exit:\n    execution time %u ms,\n    processor time  %u ms,\n    %u activations\n",currentTask->id, exec, process, calls );
+        
+        #ifdef DEBUG
+        printf("Fim do bagulho, resultado final: %u; deveria ser: %u; ou: %u\n", total, ticks, systime()- initialTime);
+        #endif
+            total+=process;
         task_switch(&mainTask);
+
     }
     messagePrint(CYN, "task_exit", "Tarefa terminada");
 }
@@ -191,6 +224,7 @@ int task_switch(task_t *task)
     task_t *t = currentTask;
     currentTask = task;
     messagePrint(WHT, "task_switch", "executando troca de contexto");
+    (currentTask->calls)++;
     swapcontext(&(t->context),&(currentTask->context));
 
     return task->id;
