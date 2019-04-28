@@ -36,7 +36,7 @@ void messagePrint(char *color, char *erro, char *message)
 //Definição de variaveis globais
 int lastTaskId;
 ucontext_t currentContext;
-task_t *currentTask, mainTask, dispatcher, *userTasks, *leadingTask;
+task_t *currentTask, mainTask, dispatcher, *readyTasks, *leadingTask;
 struct sigaction action; // estrutura que define o tratador do sinal
 struct itimerval timer;  // estrutura de inicialização do timer
 int quantum;             // quantum global
@@ -47,8 +47,8 @@ unsigned int total = 0;
 task_t *scheduler()
 {
     messagePrint(BLU, "scheduler", "realizando scheduling das tarefas");
-    task_t *aux = userTasks->next;
-    task_t *task_maior = userTasks;
+    task_t *aux = readyTasks->next;
+    task_t *task_maior = readyTasks;
 
     // envelhece as tarefas quando o processo é chamado
     do
@@ -64,7 +64,7 @@ task_t *scheduler()
         if (aux->dina_pri < task_maior->dina_pri)
             task_maior = aux;
         aux = aux->next;
-    } while (aux != userTasks);
+    } while (aux != readyTasks);
 
     task_maior->dina_pri = task_maior->fixed_pri;
     return task_maior;
@@ -74,12 +74,12 @@ void dispatcher_body()
 {
     task_t *next;
     messagePrint(MAG, "dispatcher", "entrando no dispatcher");
-    while (queue_size((queue_t *)userTasks) > 0)
+    while (queue_size((queue_t *)readyTasks) > 0)
     {
         next = scheduler();
         if (next)
         {
-            userTasks = userTasks->next;
+            readyTasks = readyTasks->next;
 
             // ações antes de lançar a tarefa "next", se houverem
             quantum = QUANTUM_TICKS; // ao entrar numa tarefa nova, precisa ser alocado o quantum para o mesmo
@@ -124,12 +124,12 @@ void ppos_init()
     mainTask.dina_pri = 0;
     getcontext(&(mainTask.context));
     currentTask = &mainTask;
-    userTasks = NULL;
+    readyTasks = NULL;
 
     leadingTask = &mainTask;
     //Inicando Dispatcher
     task_create(&dispatcher, (void *)(*dispatcher_body), "");
-    queue_remove((queue_t **)&userTasks, (queue_t *)&dispatcher);
+    queue_remove((queue_t **)&readyTasks, (queue_t *)&dispatcher);
 
     //Adicionar Main a fila (P8)
     // if(0)
@@ -158,7 +158,7 @@ void ppos_init()
     messagePrint(CYN, "ppos_init", "Dispatcher iniciado");
 
     {
-        queue_append((queue_t **)&userTasks, (queue_t *)leadingTask);
+        queue_append((queue_t **)&readyTasks, (queue_t *)leadingTask);
         leadingTask = &dispatcher;
         task_yield();
     }
@@ -199,7 +199,7 @@ int task_create(task_t *task,               // descritor da nova tarefa
     task->dina_pri = 0;
     makecontext(&(task->context), (void *)(*start_func), 1, arg);
     // if (task->id != 1)
-        queue_append((queue_t **)&userTasks, (queue_t *)task);
+    queue_append((queue_t **)&readyTasks, (queue_t *)task);
     messagePrint(CYN, "task_create", "Pronto");
 
     return lastTaskId;
@@ -211,9 +211,20 @@ void task_exit(int exitCode)
     unsigned int exec = systime() - currentTask->initialTime;
     unsigned int process = (currentTask->calls * QUANTUM_TICKS) - quantum;
     unsigned int calls = currentTask->calls;
+    //Bloco adicionado no P8
+    {
+
+        queue_t *wait_aux;
+        while (currentTask->waitTasks != NULL)
+        {
+            wait_aux = queue_remove((queue_t **)&currentTask->waitTasks, (queue_t *)(currentTask->waitTasks));
+            ((task_t *)wait_aux)->joinECode = exitCode;
+            queue_append((queue_t **)&readyTasks, wait_aux);
+        }
+    }
     if (currentTask != &dispatcher)
     {
-        queue_remove((queue_t **)&userTasks, (queue_t *)currentTask);
+        queue_remove((queue_t **)&readyTasks, (queue_t *)currentTask);
         total += process;
         printf("Task %d exit:    execution time %u ms,    processor time  %u ms,    %u activations\n", currentTask->id, exec, process, calls);
         task_switch(&dispatcher);
@@ -279,4 +290,19 @@ int task_getprio(task_t *task)
         return task->fixed_pri;
     }
     return currentTask->fixed_pri;
+}
+
+//P8
+int task_join(task_t *task)
+{
+    if ((task != NULL) && !((task->next!=NULL) ^ (task->prev!=NULL)) )
+    {
+        queue_remove((queue_t **)&readyTasks, (queue_t *)currentTask);
+        queue_t **task_queue = (queue_t **)&(task->waitTasks);
+        queue_append(task_queue, (queue_t *)currentTask);
+        task_yield();
+        return currentTask->joinECode;
+    }
+    else
+        return -1;
 }
