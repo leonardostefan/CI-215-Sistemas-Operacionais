@@ -36,13 +36,16 @@ void messagePrint(char *color, char *erro, char *message)
 //Definição de variaveis globais
 int lastTaskId;
 ucontext_t currentContext;
-task_t *currentTask, mainTask, dispatcher, *readyTasks, *leadingTask;
+task_t *currentTask, mainTask, dispatcher, *readyTasks, *leadingTask, *sleepingTasks;
 struct sigaction action; // estrutura que define o tratador do sinal
 struct itimerval timer;  // estrutura de inicialização do timer
 int quantum;             // quantum global
 unsigned int ticks = 0;
 unsigned int initialTime = 0;
 unsigned int total = 0;
+unsigned int nextWakeup = 0;
+//Bloqueio de preempção
+char preemption = 1;
 
 task_t *scheduler()
 {
@@ -69,23 +72,55 @@ task_t *scheduler()
     task_maior->dina_pri = task_maior->fixed_pri;
     return task_maior;
 }
+//P9 acordando tarefas adormecidas pelo tempo
+int wakeupTasks()
+{
+    task_t *auxTask = sleepingTasks;
+    task_t *removeTask =NULL;
+    int qt = 0;
+    int actualTime = systime();
+    do
+    {
+        removeTask=auxTask;
+        auxTask=auxTask->next;
+        if (removeTask->wakeupTime < actualTime)
+        {
+                messagePrint(RED, "task_wakeup", "movendo fila");
 
+            queue_remove((queue_t **)&sleepingTasks, (queue_t *)(removeTask));
+            queue_append((queue_t **)&readyTasks, (queue_t *)(removeTask));
+        }
+    } while (auxTask != NULL && auxTask != sleepingTasks && sleepingTasks!=NULL);
+    messagePrint(BLU, "task_wakeup", "acordou tuto");
+    return qt;
+}
 void dispatcher_body()
 {
     task_t *next;
     messagePrint(MAG, "dispatcher", "entrando no dispatcher");
-    while (queue_size((queue_t *)readyTasks) > 0)
+    while (queue_size((queue_t *)readyTasks) > 0 || sleepingTasks != NULL)
     {
-        next = scheduler();
-        if (next)
+        if (queue_size((queue_t *)readyTasks) > 0)
         {
-            readyTasks = readyTasks->next;
+            next = scheduler();
+            if (next)
+            {
+                readyTasks = readyTasks->next;
 
-            // ações antes de lançar a tarefa "next", se houverem
-            quantum = QUANTUM_TICKS; // ao entrar numa tarefa nova, precisa ser alocado o quantum para o mesmo
+                // ações antes de lançar a tarefa "next", se houverem
+                quantum = QUANTUM_TICKS; // ao entrar numa tarefa nova, precisa ser alocado o quantum para o mesmo
 
-            task_switch(next);
-            // ações após retornar da tarefa "next", se houverem
+                task_switch(next);
+                // ações após retornar da tarefa "next", se houverem
+            }
+        }
+        //Adicionado para o P9
+        if (sleepingTasks != NULL && systime() > nextWakeup)
+        {
+            messagePrint(RED, "task_sleep", "acordando");
+            preemption = 0;
+            wakeupTasks();
+            preemption = 1;
         }
     }
     messagePrint(MAG, "dispatcher", "saindo do dispatcher");
@@ -96,7 +131,7 @@ void tratador(int signal)
 {
     // necessario verificar se é tarefa do usuário ou do sistema
     if (currentTask->id != dispatcher.id)
-        if (quantum == 0)
+        if (quantum < 0 && preemption == 1)
             task_yield();
 
     quantum--;
@@ -125,6 +160,7 @@ void ppos_init()
     getcontext(&(mainTask.context));
     currentTask = &mainTask;
     readyTasks = NULL;
+    sleepingTasks = NULL;
 
     leadingTask = &mainTask;
     //Inicando Dispatcher
@@ -295,7 +331,7 @@ int task_getprio(task_t *task)
 //P8
 int task_join(task_t *task)
 {
-    if ((task != NULL) && !((task->next!=NULL) ^ (task->prev!=NULL)) )
+    if ((task != NULL) && !((task->next != NULL) ^ (task->prev != NULL)))
     {
         queue_remove((queue_t **)&readyTasks, (queue_t *)currentTask);
         queue_t **task_queue = (queue_t **)&(task->waitTasks);
@@ -305,4 +341,21 @@ int task_join(task_t *task)
     }
     else
         return -1;
+}
+
+//P9
+void task_sleep(int t)
+{
+    currentTask->wakeupTime = systime() + t;
+    preemption = 0;
+    messagePrint(WHT, "task_sleep", "botando pra dormir");
+    queue_remove((queue_t **)&readyTasks, (queue_t *)(currentTask));
+    queue_append((queue_t **)&sleepingTasks, (queue_t *)(currentTask));
+
+    if (nextWakeup != 0 || currentTask->wakeupTime < nextWakeup)
+    {
+        nextWakeup = currentTask->wakeupTime;
+    }
+    preemption = 1;
+    task_yield();
 }

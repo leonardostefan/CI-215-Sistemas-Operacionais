@@ -23,6 +23,7 @@ typedef struct task_t
    unsigned int initialTime;
    struct task_t *waitTasks;
    int joinECode;
+   unsigned int wakeupTime;
 
 
   //  unsigned int processTime;
