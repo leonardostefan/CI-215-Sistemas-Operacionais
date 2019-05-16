@@ -6,8 +6,7 @@
 #include "queue.h"
 #include <signal.h>
 #include <sys/time.h>
-  #include <unistd.h>
-
+#include <unistd.h>
 
 #define STACKSIZE 32768 /* tamanho de pilha das threads */
 
@@ -78,28 +77,30 @@ task_t *scheduler()
 int wakeupTasks()
 {
     task_t *auxTask = sleepingTasks;
-    task_t *removeTask =NULL;
+    task_t *removeTask = NULL;
     int qt = 0;
     // int actualTime = systime();
-    nextWakeup=0;
+    nextWakeup = 0;
     do
     {
-        removeTask=auxTask;
-        auxTask=auxTask->next;
+        removeTask = auxTask;
+        auxTask = auxTask->next;
         if (removeTask->wakeupTime <= systime())
         {
-                messagePrint(RED, "task_wakeup", "movendo fila");
+            messagePrint(RED, "task_wakeup", "movendo fila");
 
             queue_remove((queue_t **)&sleepingTasks, (queue_t *)(removeTask));
             queue_append((queue_t **)&readyTasks, (queue_t *)(removeTask));
-        }else{
+        }
+        else
+        {
             if (nextWakeup != 0 || removeTask->wakeupTime < nextWakeup)
-                {
-                    nextWakeup = removeTask->wakeupTime;
-                }
+            {
+                nextWakeup = removeTask->wakeupTime;
+            }
         }
 
-    } while (auxTask != NULL && auxTask != sleepingTasks && sleepingTasks!=NULL);
+    } while (auxTask != NULL && auxTask != sleepingTasks && sleepingTasks != NULL);
 
     messagePrint(BLU, "task_wakeup", "acordou tuto");
     return qt;
@@ -123,10 +124,11 @@ void dispatcher_body()
                 task_switch(next);
                 // ações após retornar da tarefa "next", se houverem
             }
-        }else
-            {
-                sleep(0);
-            }
+        }
+        else
+        {
+            sleep(0);
+        }
         //Adicionado para o P9
         if (sleepingTasks != NULL && systime() >= nextWakeup)
         {
@@ -371,4 +373,54 @@ void task_sleep(int t)
     }
     preemption = 1;
     task_yield();
+}
+//P10
+int sem_create(semaphore_t *s, int value)
+{
+    s->queue = NULL;
+    s->size = value;
+}
+//P10
+int sem_down(semaphore_t *s)
+{
+    if (s == NULL)
+        return -1;
+    if (s->size < 0)
+    {
+        queue_remove((queue_t **)&readyTasks, (queue_t *)(currentTask));
+        queue_append((queue_t **)(s->queue), (queue_t *)(currentTask));
+        currentTask->joinECode = 0;
+        task_yield();
+    }
+    (s->size)--;
+
+    return currentTask->joinECode;
+}
+//P10
+
+int sem_up(semaphore_t *s)
+{
+    if (s == NULL)
+        return -1;
+    if (s->size < 0)
+    {
+        task_t *aux;
+        aux = queue_removed((queue_t **)(s->queue), (queue_t *)*(s->queue));
+        queue_append((queue_t **)&readyTasks, (queue_t *)(aux));
+    }
+    s->size++;
+}
+//P10
+int sem_destroy(semaphore_t *s)
+{
+    if (s == NULL)
+        return -1;
+    while (s->queue != NULL)
+    {
+        task_t *aux;
+        aux = queue_removed((queue_t **)(s->queue), (queue_t *)*(s->queue));
+        aux->joinECode = -1;
+        queue_append((queue_t **)&readyTasks, (queue_t *)(aux));
+    }
+    return 0;
 }
