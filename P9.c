@@ -18,7 +18,7 @@ void Body (void * arg)
    char *status ;
 
    printf ("%5d ms: %s: inicio\n", systime(), (char *) arg) ;
-   for (i=0; i<20; i++)
+   for (i=0; i<50; i++)
    {
       // sorteia tempo entre 0 e 2000 ms (2s), em saltos de 100 ms
       timeSleep = 100 * (random() % 11) ;
@@ -33,7 +33,7 @@ void Body (void * arg)
       timeAfter  = systime () ;
 
       // verifica se dormiu o intervalo especificado
-      status = (timeAfter - timeBefore) == timeSleep ? "ok" : "ERROR" ;
+      status = (timeAfter - timeBefore) < (timeSleep+19) ? "ok" : "ERROR" ;
 
       // informa o quanto efetivamente dormiu
       printf ("%5d ms: %s dormiu     %d ms (%s)\n", systime(),

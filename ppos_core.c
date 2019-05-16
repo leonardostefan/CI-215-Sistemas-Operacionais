@@ -6,6 +6,8 @@
 #include "queue.h"
 #include <signal.h>
 #include <sys/time.h>
+  #include <unistd.h>
+
 
 #define STACKSIZE 32768 /* tamanho de pilha das threads */
 
@@ -78,19 +80,27 @@ int wakeupTasks()
     task_t *auxTask = sleepingTasks;
     task_t *removeTask =NULL;
     int qt = 0;
-    int actualTime = systime();
+    // int actualTime = systime();
+    nextWakeup=0;
     do
     {
         removeTask=auxTask;
         auxTask=auxTask->next;
-        if (removeTask->wakeupTime < actualTime)
+        if (removeTask->wakeupTime <= systime())
         {
                 messagePrint(RED, "task_wakeup", "movendo fila");
 
             queue_remove((queue_t **)&sleepingTasks, (queue_t *)(removeTask));
             queue_append((queue_t **)&readyTasks, (queue_t *)(removeTask));
+        }else{
+            if (nextWakeup != 0 || removeTask->wakeupTime < nextWakeup)
+                {
+                    nextWakeup = removeTask->wakeupTime;
+                }
         }
+
     } while (auxTask != NULL && auxTask != sleepingTasks && sleepingTasks!=NULL);
+
     messagePrint(BLU, "task_wakeup", "acordou tuto");
     return qt;
 }
@@ -98,7 +108,7 @@ void dispatcher_body()
 {
     task_t *next;
     messagePrint(MAG, "dispatcher", "entrando no dispatcher");
-    while (queue_size((queue_t *)readyTasks) > 0 || sleepingTasks != NULL)
+    while ((readyTasks != NULL) || sleepingTasks != NULL)
     {
         if (queue_size((queue_t *)readyTasks) > 0)
         {
@@ -113,9 +123,12 @@ void dispatcher_body()
                 task_switch(next);
                 // ações após retornar da tarefa "next", se houverem
             }
-        }
+        }else
+            {
+                sleep(0);
+            }
         //Adicionado para o P9
-        if (sleepingTasks != NULL && systime() > nextWakeup)
+        if (sleepingTasks != NULL && systime() >= nextWakeup)
         {
             messagePrint(RED, "task_sleep", "acordando");
             preemption = 0;

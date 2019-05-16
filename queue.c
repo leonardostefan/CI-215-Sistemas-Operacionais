@@ -140,8 +140,7 @@ int queue_size(queue_t *queue)
         size++;
         if (queue->next != queue)
         {
-            for (size = 1; aux->next != queue; aux = aux->next, size++)
-                ;
+            for (size = 1; aux->next != queue; aux = aux->next, size++);
         }
         else
         {
@@ -155,7 +154,7 @@ void queue_print(char *name, queue_t *queue, void print_elem(void *))
     if (queue != NULL)
     {
 
-        if (queue->next != queue)
+        if (queue->next != queue) 
         {
             for (queue_t *aux = queue; aux->next != queue; aux=aux->next)
             {
