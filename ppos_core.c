@@ -8,7 +8,8 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#define STACKSIZE 32768 /* tamanho de pilha das threads */
+#define STACKSIZE 32768 /* tamanho de pilha das thls \
+lsreads */
 
 //Debug Collors
 #define RED "\x1B[31m"
@@ -76,6 +77,8 @@ task_t *scheduler()
 //P9 acordando tarefas adormecidas pelo tempo
 int wakeupTasks()
 {
+    messagePrint(BLU, "task_wakeup", "Acordando tarefas");
+
     task_t *auxTask = sleepingTasks;
     task_t *removeTask = NULL;
     int qt = 0;
@@ -87,7 +90,6 @@ int wakeupTasks()
         auxTask = auxTask->next;
         if (removeTask->wakeupTime <= systime())
         {
-            messagePrint(RED, "task_wakeup", "movendo fila");
 
             queue_remove((queue_t **)&sleepingTasks, (queue_t *)(removeTask));
             queue_append((queue_t **)&readyTasks, (queue_t *)(removeTask));
@@ -102,7 +104,6 @@ int wakeupTasks()
 
     } while (auxTask != NULL && auxTask != sleepingTasks && sleepingTasks != NULL);
 
-    messagePrint(BLU, "task_wakeup", "acordou tuto");
     return qt;
 }
 void dispatcher_body()
@@ -132,7 +133,6 @@ void dispatcher_body()
         //Adicionado para o P9
         if (sleepingTasks != NULL && systime() >= nextWakeup)
         {
-            messagePrint(RED, "task_sleep", "acordando");
             preemption = 0;
             wakeupTasks();
             preemption = 1;
@@ -379,36 +379,47 @@ int sem_create(semaphore_t *s, int value)
 {
     s->queue = NULL;
     s->size = value;
+    return 0;
 }
 //P10
 int sem_down(semaphore_t *s)
 {
+
+    preemption = 0;
     if (s == NULL)
         return -1;
+    currentTask->joinECode = 0;
+
+    (s->size)--;
     if (s->size < 0)
     {
+        messagePrint(RED, "sem_dow", "manipulando a fila");
         queue_remove((queue_t **)&readyTasks, (queue_t *)(currentTask));
-        queue_append((queue_t **)(s->queue), (queue_t *)(currentTask));
-        currentTask->joinECode = 0;
+        queue_append((queue_t **)(&(s->queue)), (queue_t *)(currentTask));
         task_yield();
     }
-    (s->size)--;
 
+    preemption = 1;
     return currentTask->joinECode;
 }
 //P10
 
 int sem_up(semaphore_t *s)
 {
+    preemption = 0;
     if (s == NULL)
         return -1;
-    if (s->size < 0)
+    s->size++;
+
+    if (s->size <=0 )
     {
-        task_t *aux;
-        aux = queue_removed((queue_t **)(s->queue), (queue_t *)*(s->queue));
+        messagePrint(RED, "sem_up", "manipulando a fila");
+        queue_t *aux;
+        aux = queue_remove((queue_t **)(&(s->queue)), (queue_t *)(s->queue));
         queue_append((queue_t **)&readyTasks, (queue_t *)(aux));
     }
-    s->size++;
+    preemption = 1;
+    return 0;
 }
 //P10
 int sem_destroy(semaphore_t *s)
@@ -418,7 +429,7 @@ int sem_destroy(semaphore_t *s)
     while (s->queue != NULL)
     {
         task_t *aux;
-        aux = queue_removed((queue_t **)(s->queue), (queue_t *)*(s->queue));
+        aux = (task_t *)queue_remove((queue_t **)&(s->queue), (queue_t *)(s->queue));
         aux->joinECode = -1;
         queue_append((queue_t **)&readyTasks, (queue_t *)(aux));
     }
