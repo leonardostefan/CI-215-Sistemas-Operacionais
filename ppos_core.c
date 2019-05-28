@@ -38,7 +38,7 @@ void messagePrint(char *color, char *erro, char *message)
 //Definição de variaveis globais
 int lastTaskId;
 ucontext_t currentContext;
-task_t *currentTask, mainTask, dispatcher, *readyTasks, *leadingTask, *sleepingTasks;
+task_t *currentTask, mainTask, dispatcher, *readyTasks, *sleepingTasks, *waitTasks;
 struct sigaction action; // estrutura que define o tratador do sinal
 struct itimerval timer;  // estrutura de inicialização do timer
 int quantum;             // quantum global
@@ -177,7 +177,6 @@ void ppos_init()
     readyTasks = NULL;
     sleepingTasks = NULL;
 
-    leadingTask = &mainTask;
     //Inicando Dispatcher
     task_create(&dispatcher, (void *)(*dispatcher_body), "");
     queue_remove((queue_t **)&readyTasks, (queue_t *)&dispatcher);
@@ -208,11 +207,8 @@ void ppos_init()
     initialTime = systime();
     messagePrint(CYN, "ppos_init", "Dispatcher iniciado");
 
-    {
-        queue_append((queue_t **)&readyTasks, (queue_t *)leadingTask);
-        leadingTask = &dispatcher;
-        task_yield();
-    }
+    queue_append((queue_t **)&readyTasks, (queue_t *)&mainTask);
+    task_yield();
 }
 
 // Cria uma nova tarefa. Retorna um ID> 0 ou erro.
@@ -266,9 +262,9 @@ void task_exit(int exitCode)
     {
 
         queue_t *wait_aux;
-        while (currentTask->waitTasks != NULL)
+        while (waitTasks != NULL)
         {
-            wait_aux = queue_remove((queue_t **)&currentTask->waitTasks, (queue_t *)(currentTask->waitTasks));
+            wait_aux = queue_remove((queue_t **)&waitTasks, (queue_t *)(waitTasks));
             ((task_t *)wait_aux)->joinECode = exitCode;
             queue_append((queue_t **)&readyTasks, wait_aux);
         }
@@ -290,7 +286,7 @@ void task_exit(int exitCode)
 #endif
         total += process;
 
-        task_switch(leadingTask);
+        task_switch(&mainTask);
     }
     messagePrint(CYN, "task_exit", "Tarefa terminada");
 }
@@ -349,8 +345,7 @@ int task_join(task_t *task)
     if ((task != NULL) && !((task->next != NULL) ^ (task->prev != NULL)))
     {
         queue_remove((queue_t **)&readyTasks, (queue_t *)currentTask);
-        queue_t **task_queue = (queue_t **)&(task->waitTasks);
-        queue_append(task_queue, (queue_t *)currentTask);
+        queue_append((queue_t **)&waitTasks, (queue_t *)currentTask);
         task_yield();
         return currentTask->joinECode;
     }
@@ -376,7 +371,7 @@ void task_sleep(int t)
 }
 //P10
 int sem_create(semaphore_t *s, int value)
-{
+{   
     s->queue = NULL;
     s->size = value;
     return 0;

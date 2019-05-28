@@ -21,7 +21,6 @@ typedef struct task_t
    int dina_pri;		// prioridade dinâmica inicia igual a fixa
    unsigned int calls;
    unsigned int initialTime;
-   struct task_t *waitTasks;
    int joinECode;
    unsigned int wakeupTime;
 
