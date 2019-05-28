@@ -394,8 +394,11 @@ int sem_down(semaphore_t *s)
     if (s->size < 0)
     {
         messagePrint(RED, "sem_dow", "manipulando a fila");
-        queue_remove((queue_t **)&readyTasks, (queue_t *)(currentTask));
-        queue_append((queue_t **)(&(s->queue)), (queue_t *)(currentTask));
+
+        queue_append((queue_t **)&(s->queue), queue_remove((queue_t **)&readyTasks, (queue_t *)currentTask));
+
+        // queue_append((queue_t **)(&(s->queue)), (queue_t *)(currentTask));
+        // queue_remove((queue_t **)&readyTasks, (queue_t *)(currentTask));
         task_yield();
     }
 
@@ -414,9 +417,12 @@ int sem_up(semaphore_t *s)
     if (s->size <=0 )
     {
         messagePrint(RED, "sem_up", "manipulando a fila");
-        queue_t *aux;
-        aux = queue_remove((queue_t **)(&(s->queue)), (queue_t *)(s->queue));
-        queue_append((queue_t **)&readyTasks, (queue_t *)(aux));
+
+        queue_append((queue_t **) &readyTasks, queue_remove((queue_t **)&s->queue, (queue_t *) s->queue));
+
+        // queue_t *aux;
+        // aux = queue_remove((queue_t **)(&(s->queue)), (queue_t *)(s->queue));
+        // queue_append((queue_t **)&readyTasks, (queue_t *)(aux));
     }
     preemption = 1;
     return 0;

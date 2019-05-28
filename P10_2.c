@@ -26,6 +26,7 @@ void taskBody(void *id)
       soma += 1 ;
       sem_up (&s) ;
    }
+   printf ("Soma é igual a: %ld\n", soma);
 
    task_exit (0) ;
 }
