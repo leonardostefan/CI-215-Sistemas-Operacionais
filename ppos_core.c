@@ -3,6 +3,7 @@
 #include "ppos.h"
 #include "stdlib.h"
 #include <stdio.h>
+#include <string.h>
 #include "queue.h"
 #include <signal.h>
 #include <sys/time.h>
@@ -435,4 +436,67 @@ int sem_destroy(semaphore_t *s)
         queue_append((queue_t **)&readyTasks, (queue_t *)(aux));
     }
     return 0;
+}
+
+
+// P12
+int mqueue_create (mqueue_t *queue, int max, int size){
+    if(queue){
+        queue->maxSize=max;
+        queue->size=size;
+        queue->msg=NULL;
+        if(sem_create(&queue->vagas, max)==-1 || sem_create(&queue->itens, 0)==-1 ||sem_create(&queue->buffer,1)==-1)
+            return -1;
+        return 0;
+    }
+    return -1;
+}
+// P12
+int mqueue_send (mqueue_t *queue, void *msg){
+    if(queue && msg){
+        if(sem_down(&(queue->vagas))==-1 || sem_down(&(queue->buffer))==-1)
+            return (-1);
+
+        filamsg *nova=malloc(sizeof(filamsg));
+        nova->msg=malloc(queue->size);
+        nova->msg=memcpy (nova->msg, msg, queue->size);
+        queue_append((queue_t**)&queue->msg,(queue_t*)nova);
+
+        if( sem_up(&(queue->buffer))==-1 || sem_up(&(queue->itens))==-1)
+            return (-1);
+        return 0;
+    }
+    return -1;
+}
+
+//P12
+int mqueue_recv (mqueue_t *queue, void *msg){
+    if(queue){
+        if( sem_down(&(queue->itens))==-1 || sem_down(&(queue->buffer))==-1)
+            return (-1);
+        filamsg *aux = (filamsg*)queue_remove((queue_t**)&queue->msg,(queue_t*)queue->msg);
+        msg=memcpy (msg, aux->msg, queue->size);
+        free(aux->msg);
+        free(aux);
+
+        if(sem_up(&(queue->buffer))==-1 || sem_up(&(queue->vagas))==-1)
+            return (-1);
+        return 0;
+    }
+    return -1;
+}
+
+//P12
+int mqueue_destroy (mqueue_t *queue){
+    if(queue){
+        while(queue->msg){
+            filamsg *aux = (filamsg*)queue_remove((queue_t**)&queue->msg,(queue_t*)queue->msg);
+            free(aux->msg);
+            free(aux);
+        }
+        if(sem_destroy (&queue->itens)==-1 || sem_destroy (&queue->vagas)==-1 || sem_destroy (&queue->buffer)==-1)
+            return -1;
+        return 0;
+    }
+    return -1;
 }
