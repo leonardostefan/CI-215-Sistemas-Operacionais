@@ -225,7 +225,7 @@ int task_create(task_t *task,               // descritor da nova tarefa
     task->calls = 0;
     task->initialTime = systime();
 
-    task->stack = malloc(STACKSIZE);
+    task->stack = calloc(STACKSIZE, sizeof(void));
     if (task->stack)
     {
         task->context.uc_stack.ss_sp = task->stack;
@@ -372,7 +372,7 @@ void task_sleep(int t)
 }
 //P10
 int sem_create(semaphore_t *s, int value)
-{   
+{
     s->queue = NULL;
     s->size = value;
     return 0;
@@ -410,11 +410,11 @@ int sem_up(semaphore_t *s)
         return -1;
     s->size++;
 
-    if (s->size <=0 )
+    if (s->size <= 0)
     {
         messagePrint(RED, "sem_up", "manipulando a fila");
 
-        queue_append((queue_t **) &readyTasks, queue_remove((queue_t **)&s->queue, (queue_t *) s->queue));
+        queue_append((queue_t **)&readyTasks, queue_remove((queue_t **)&s->queue, (queue_t *)s->queue));
 
         // queue_t *aux;
         // aux = queue_remove((queue_t **)(&(s->queue)), (queue_t *)(s->queue));
@@ -438,31 +438,34 @@ int sem_destroy(semaphore_t *s)
     return 0;
 }
 
-
 // P12
-int mqueue_create (mqueue_t *queue, int max, int size){
-    if(queue){
-        queue->maxSize=max;
-        queue->size=size;
-        queue->msg=NULL;
-        if(sem_create(&queue->vagas, max)==-1 || sem_create(&queue->itens, 0)==-1 ||sem_create(&queue->buffer,1)==-1)
+int mqueue_create(mqueue_t *queue, int max, int size)
+{
+    if (queue)
+    {
+        queue->maxSize = max;
+        queue->size = size;
+        queue->msg = NULL;
+        if (sem_create(&queue->vagas, max) == -1 || sem_create(&queue->itens, 0) == -1 || sem_create(&queue->buffer, 1) == -1)
             return -1;
         return 0;
     }
     return -1;
 }
 // P12
-int mqueue_send (mqueue_t *queue, void *msg){
-    if(queue && msg){
-        if(sem_down(&(queue->vagas))==-1 || sem_down(&(queue->buffer))==-1)
+int mqueue_send(mqueue_t *queue, void *msg)
+{
+    if (queue && msg)
+    {
+        if (sem_down(&(queue->vagas)) == -1 || sem_down(&(queue->buffer)) == -1)
             return (-1);
 
-        filamsg *nova=malloc(sizeof(filamsg));
-        nova->msg=malloc(queue->size);
-        nova->msg=memcpy (nova->msg, msg, queue->size);
-        queue_append((queue_t**)&queue->msg,(queue_t*)nova);
+        filamsg *nova = calloc(1, sizeof(filamsg));
+        nova->msg = calloc(queue->size, sizeof(void));
+        nova->msg = memcpy(nova->msg, msg, queue->size);
+        queue_append((queue_t **)&queue->msg, (queue_t *)nova);
 
-        if( sem_up(&(queue->buffer))==-1 || sem_up(&(queue->itens))==-1)
+        if (sem_up(&(queue->buffer)) == -1 || sem_up(&(queue->itens)) == -1)
             return (-1);
         return 0;
     }
@@ -470,16 +473,18 @@ int mqueue_send (mqueue_t *queue, void *msg){
 }
 
 //P12
-int mqueue_recv (mqueue_t *queue, void *msg){
-    if(queue){
-        if( sem_down(&(queue->itens))==-1 || sem_down(&(queue->buffer))==-1)
+int mqueue_recv(mqueue_t *queue, void *msg)
+{
+    if (queue)
+    {
+        if (sem_down(&(queue->itens)) == -1 || sem_down(&(queue->buffer)) == -1)
             return (-1);
-        filamsg *aux = (filamsg*)queue_remove((queue_t**)&queue->msg,(queue_t*)queue->msg);
-        msg=memcpy (msg, aux->msg, queue->size);
+        filamsg *aux = (filamsg *)queue_remove((queue_t **)&queue->msg, (queue_t *)queue->msg);
+        msg = memcpy(msg, aux->msg, queue->size);
         free(aux->msg);
         free(aux);
 
-        if(sem_up(&(queue->buffer))==-1 || sem_up(&(queue->vagas))==-1)
+        if (sem_up(&(queue->buffer)) == -1 || sem_up(&(queue->vagas)) == -1)
             return (-1);
         return 0;
     }
@@ -487,14 +492,17 @@ int mqueue_recv (mqueue_t *queue, void *msg){
 }
 
 //P12
-int mqueue_destroy (mqueue_t *queue){
-    if(queue){
-        while(queue->msg){
-            filamsg *aux = (filamsg*)queue_remove((queue_t**)&queue->msg,(queue_t*)queue->msg);
+int mqueue_destroy(mqueue_t *queue)
+{
+    if (queue)
+    {
+        while (queue->msg)
+        {
+            filamsg *aux = (filamsg *)queue_remove((queue_t **)&queue->msg, (queue_t *)queue->msg);
             free(aux->msg);
             free(aux);
         }
-        if(sem_destroy (&queue->itens)==-1 || sem_destroy (&queue->vagas)==-1 || sem_destroy (&queue->buffer)==-1)
+        if (sem_destroy(&queue->itens) == -1 || sem_destroy(&queue->vagas) == -1 || sem_destroy(&queue->buffer) == -1)
             return -1;
         return 0;
     }
